@@ -4,45 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Moberly Chatroom</title>
-<link rel="stylesheet" href="style.css">
 <style>
-/* THEME VARIABLES */
-:root {
-  --bg-color: #ffffff;
-  --text-color: #111;
-  --primary-color: #6200ee;
-  --secondary-color: #03dac6;
-  --accent-color: #ffcc00;
-}
-
+/* === THEMES === */
 body.light-mode {
   --bg-color: #ffffff;
-  --text-color: #111;
-  --primary-color: #6200ee;
-  --secondary-color: #03dac6;
-  --accent-color: #ffcc00;
+  --text-color: #000000;
+  --accent-color: #000000;
 }
 
 body.dark-mode {
-  --bg-color: #121212;
-  --text-color: #eee;
-  --primary-color: #bb86fc;
-  --secondary-color: #03dac6;
-  --accent-color: #ffcc00;
+  --bg-color: #000000;
+  --text-color: #ffffff;
+  --accent-color: #ffffff;
 }
 
 body.lebron-mode {
-  --bg-color: #1a1a1a;
-  --text-color: #fff;
-  --primary-color: #552583; /* Lakers purple */
-  --secondary-color: #fdb927; /* Lakers gold */
-  --accent-color: #fdb927;
+  --bg-color: #fdb927;   /* Lakers gold */
+  --text-color: #000000; /* Black text */
+  --accent-color: #552583; /* Lakers purple */
 }
 
 body {
   background-color: var(--bg-color);
   color: var(--text-color);
-  font-family: 'Roboto', sans-serif;
+  font-family: Arial, sans-serif;
+  transition: background 0.3s, color 0.3s;
 }
 
 .container {
@@ -65,13 +51,15 @@ body {
   border-radius: 6px;
   border: 1px solid var(--accent-color);
   width: 70%;
+  background: var(--bg-color);
+  color: var(--text-color);
 }
 
 #message-form button {
   padding: 0.5rem 1rem;
   border-radius: 6px;
   border: none;
-  background-color: var(--primary-color);
+  background-color: var(--accent-color);
   color: var(--text-color);
   cursor: pointer;
 }
@@ -82,6 +70,8 @@ body {
   border-radius: 6px;
   border: none;
   cursor: pointer;
+  background: var(--accent-color);
+  color: var(--text-color);
 }
 
 .dm-list button {
@@ -92,8 +82,12 @@ body {
   cursor: pointer;
   border-radius: 6px;
   border: none;
-  background-color: var(--secondary-color);
+  background-color: var(--accent-color);
   color: var(--text-color);
+}
+
+#email-suggestions div:hover {
+  background-color: rgba(0,0,0,0.1);
 }
 </style>
 </head>
@@ -101,12 +95,14 @@ body {
 <div class="container">
   <h1>Moberly Chatroom</h1>
 
+  <!-- Theme Buttons -->
   <div id="theme-buttons">
     <button onclick="setTheme('light-mode')">Light</button>
     <button onclick="setTheme('dark-mode')">Dark</button>
     <button onclick="setTheme('lebron-mode')">LeBron</button>
   </div>
 
+  <!-- Auth -->
   <div id="auth">
     <button id="login">Login with Google</button>
     <button id="logout" style="display:none;">Logout</button>
@@ -114,17 +110,33 @@ body {
 
   <div id="user-profile"></div>
 
-  <form id="dm-form" style="display:none;">
-    <input type="email" id="dm-email" placeholder="Enter email to DM" required list="recent-emails">
-    <datalist id="recent-emails"></datalist>
+  <!-- DM Form -->
+  <form id="dm-form" style="display:none; position:relative;">
+    <input type="email" id="dm-email" placeholder="Enter email to DM" required autocomplete="off">
+    <div id="email-suggestions" style="
+      position:absolute;
+      top:40px;
+      left:0;
+      right:0;
+      background: var(--bg-color);
+      border: 1px solid var(--accent-color);
+      border-radius:6px;
+      max-height:200px;
+      overflow-y:auto;
+      display:none;
+      z-index:1000;
+    "></div>
     <button type="submit">Start DM</button>
   </form>
 
+  <!-- DM Buttons -->
   <button id="check-dms" style="display:none;">Check DMs</button>
   <div id="dm-requests" class="dm-list" style="display:none;"></div>
 
+  <!-- Messages -->
   <div id="messages"></div>
 
+  <!-- Message Form -->
   <form id="message-form" style="display:none;">
     <input type="text" id="message-input" placeholder="Type your message">
     <input type="file" id="file-input">
@@ -133,64 +145,121 @@ body {
   </form>
 </div>
 
-<script type="module" src="app.js"></script>
-<script>
+<!-- Firebase SDKs -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+// TODO: Replace with your Firebase config
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_BUCKET",
+  messagingSenderId: "YOUR_SENDER",
+  appId: "YOUR_APP_ID"
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 // Theme switching
 function setTheme(theme) {
   document.body.className = theme;
 }
 
 // DM system
-let dmRequests = []; // DM requests received
-let dmHistory = [];  // Sent/received DMs
+let dmRequests = [];
+let dmHistory = [];
+let allUsers = [];
 
-// Display DM requests
-document.getElementById('check-dms').addEventListener('click', () => {
-  const requestsDiv = document.getElementById('dm-requests');
-  requestsDiv.innerHTML = '';
-  if(dmRequests.length === 0){
-    requestsDiv.innerHTML = '<p>No DM requests</p>';
-  } else {
-    dmRequests.forEach((req, i) => {
-      const btn = document.createElement('button');
+// Load all users from Firestore
+async function fetchUsers() {
+  const usersRef = collection(db, "users"); // Your collection
+  const snap = await getDocs(usersRef);
+  snap.forEach(doc => {
+    const data = doc.data();
+    allUsers.push({
+      email: data.email,
+      name: data.name || data.email,
+      photo: data.photoURL || "https://via.placeholder.com/32"
+    });
+  });
+}
+fetchUsers();
+
+// Email suggestions
+const emailInput = document.getElementById("dm-email");
+const suggestionsDiv = document.getElementById("email-suggestions");
+emailInput.addEventListener("input", () => {
+  const query = emailInput.value.toLowerCase();
+  suggestionsDiv.innerHTML = "";
+  if (!query) {
+    suggestionsDiv.style.display = "none";
+    return;
+  }
+  const matches = allUsers.filter(u => u.email.toLowerCase().startsWith(query));
+  if (matches.length === 0) { suggestionsDiv.style.display = "none"; return; }
+
+  matches.forEach(u => {
+    const option = document.createElement("div");
+    option.style.display = "flex";
+    option.style.alignItems = "center";
+    option.style.padding = "6px";
+    option.style.cursor = "pointer";
+    option.innerHTML = `
+      <img src="${u.photo}" style="width:24px;height:24px;border-radius:50%;margin-right:8px;">
+      <strong>${u.name}</strong> &lt;${u.email}&gt;
+    `;
+    option.onclick = () => {
+      emailInput.value = u.email;
+      suggestionsDiv.style.display = "none";
+    };
+    suggestionsDiv.appendChild(option);
+  });
+  suggestionsDiv.style.display = "block";
+});
+document.addEventListener("click", (e) => {
+  if (!emailInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+    suggestionsDiv.style.display = "none";
+  }
+});
+
+// Send DM
+document.getElementById("dm-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const email = emailInput.value;
+  if (!email) return;
+  dmHistory.push({ email, message: "DM started" });
+  alert("DM request sent to " + email);
+  emailInput.value = "";
+  document.getElementById("dm-form").style.display = "none";
+});
+
+// Check DM requests
+document.getElementById("check-dms").addEventListener("click", () => {
+  const requestsDiv = document.getElementById("dm-requests");
+  requestsDiv.innerHTML = "";
+  if (dmRequests.length === 0) { requestsDiv.innerHTML = "<p>No DM requests</p>"; }
+  else {
+    dmRequests.forEach(req => {
+      const btn = document.createElement("button");
       btn.textContent = req;
       btn.onclick = () => {
-        document.getElementById('dm-email').value = req;
-        document.getElementById('dm-form').style.display = 'block';
+        emailInput.value = req;
+        document.getElementById("dm-form").style.display = "block";
       };
       requestsDiv.appendChild(btn);
     });
   }
-  requestsDiv.style.display = 'block';
+  requestsDiv.style.display = "block";
 });
 
-// Send DM
-document.getElementById('dm-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const emailInput = document.getElementById('dm-email');
-  const email = emailInput.value;
-  if(email){
-    // Add to recent emails autofill
-    const dataList = document.getElementById('recent-emails');
-    if (![...dataList.options].some(o => o.value === email)) {
-      const option = document.createElement('option');
-      option.value = email;
-      dataList.appendChild(option);
-    }
-
-    dmHistory.push({email: email, message: 'DM started'});
-    alert('DM request sent to ' + email);
-    emailInput.value = '';
-    document.getElementById('dm-form').style.display = 'none';
-  }
-});
-
-// Example function to receive a DM request
+// Example: simulate receiving a DM request
 function receiveDMRequest(email){
-  if(!dmRequests.includes(email)){
+  if (!dmRequests.includes(email)) {
     dmRequests.push(email);
-    document.getElementById('check-dms').style.display = 'inline-block';
-    alert('New DM request from ' + email);
+    document.getElementById("check-dms").style.display = "inline-block";
+    alert("New DM request from " + email);
   }
 }
 </script>
