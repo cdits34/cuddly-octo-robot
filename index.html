@@ -3,32 +3,278 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Firebase Chatroom</title>
-<link rel="stylesheet" href="style.css">
+<title>Moberly Chatroom</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-color: #f5f5f5;
+  --text-color: #111;
+  --primary-color: #6200ee;
+  --secondary-color: #03dac6;
+  --accent-color: #ffcc00;
+}
+
+/* THEME VARIABLES */
+body.light-mode {
+  --bg-color: #ffffff;
+  --text-color: #111;
+  --primary-color: #6200ee;
+  --secondary-color: #03dac6;
+  --accent-color: #ffcc00;
+}
+
+body.dark-mode {
+  --bg-color: #121212;
+  --text-color: #eee;
+  --primary-color: #bb86fc;
+  --secondary-color: #03dac6;
+  --accent-color: #ffcc00;
+}
+
+body.lebron-mode {
+  --bg-color: #1a1a1a;
+  --text-color: #fff;
+  --primary-color: #552583; /* Lakers purple */
+  --secondary-color: #fdb927; /* Lakers gold */
+  --accent-color: #fdb927;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+header {
+  background-color: var(--primary-color);
+  color: var(--text-color);
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.theme-buttons button {
+  margin-left: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  color: var(--text-color);
+  background-color: var(--secondary-color);
+  border-radius: 6px;
+}
+
+.chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  gap: 1rem;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--accent-color);
+  border-radius: 8px;
+  padding: 1rem;
+  background-color: rgba(255,255,255,0.05);
+}
+
+.message-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.message-input input[type="text"] {
+  flex: 1;
+  padding: 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent-color);
+  font-size: 1rem;
+}
+
+.message-input button {
+  border: none;
+  background-color: var(--primary-color);
+  color: var(--text-color);
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+}
+
+.message-input button img {
+  width: 24px;
+  height: 24px;
+}
+
+/* DM Buttons */
+.dm-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.dm-buttons button {
+  flex: 1;
+  border: none;
+  padding: 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  background-color: var(--secondary-color);
+  color: var(--text-color);
+  font-weight: bold;
+}
+
+/* DM Modal */
+.dm-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.6);
+  justify-content: center;
+  align-items: center;
+}
+
+.dm-modal.active {
+  display: flex;
+}
+
+.dm-content {
+  background-color: var(--bg-color);
+  padding: 2rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dm-content input {
+  padding: 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent-color);
+}
+
+.dm-content button {
+  padding: 0.8rem;
+  border-radius: 8px;
+  border: none;
+  background-color: var(--primary-color);
+  color: var(--text-color);
+  cursor: pointer;
+  font-weight: bold;
+}
+</style>
 </head>
-<body>
-<div class="container">
+<body class="light-mode">
+
+<header>
   <h1>Moberly Chatroom</h1>
-  <div id="auth">
-    <button id="login">Login with Google</button>
-    <button id="logout" style="display:none;">Logout</button>
+  <div class="theme-buttons">
+    <button onclick="setTheme('light-mode')">Light</button>
+    <button onclick="setTheme('dark-mode')">Dark</button>
+    <button onclick="setTheme('lebron-mode')">LeBron</button>
   </div>
-  <div id="user-profile"></div>
+</header>
 
-  <form id="dm-form" style="display:none;">
-    <input type="email" id="dm-email" placeholder="Enter email to DM" required>
-    <button type="submit">Start DM (a lil broken)</button>
-  </form>
+<div class="chat-container">
+  <div class="messages" id="messages">
+    <!-- Messages will appear here -->
+  </div>
 
-  <div id="messages"></div>
+  <div class="message-input">
+    <button id="attach-btn"><img src="https://img.icons8.com/ios-filled/50/000000/paperclip.png"/></button>
+    <input type="text" id="message-text" placeholder="Type your message...">
+    <button id="send-btn"><img src="https://img.icons8.com/ios-filled/50/000000/arrow.png"/></button>
+  </div>
 
-  <form id="message-form" style="display:none;">
-    <input type="text" id="message-input" placeholder="Type your message">
-    <input type="file" id="file-input">
-    <button type="submit">Send</button>
-    <p><em>Note: videos may not be able to send due to size limits.</em></p>
-  </form>
+  <div class="dm-buttons">
+    <button onclick="toggleDMModal('requests')">View DM Requests</button>
+    <button onclick="toggleDMModal('dms')">View DMs</button>
+  </div>
 </div>
-<script type="module" src="app.js"></script>
+
+<!-- DM Modal -->
+<div class="dm-modal" id="dm-modal">
+  <div class="dm-content">
+    <h2>Send Private Message</h2>
+    <input type="email" id="dm-email" placeholder="Recipient email" list="recent-emails">
+    <datalist id="recent-emails">
+      <!-- Autofill emails will go here -->
+    </datalist>
+    <input type="text" id="dm-text" placeholder="Message...">
+    <button onclick="sendDM()">Send DM</button>
+    <button onclick="toggleDMModal()">Close</button>
+  </div>
+</div>
+
+<script>
+function setTheme(theme) {
+  document.body.className = theme;
+}
+
+function toggleDMModal(mode = '') {
+  const modal = document.getElementById('dm-modal');
+  modal.classList.toggle('active');
+  // Could populate emails or messages depending on mode
+}
+
+function sendDM() {
+  const emailInput = document.getElementById('dm-email');
+  const textInput = document.getElementById('dm-text');
+
+  if(emailInput.value && textInput.value){
+    alert('DM sent to ' + emailInput.value + ': ' + textInput.value);
+
+    // Add to autofill
+    const dataList = document.getElementById('recent-emails');
+    if (![...dataList.options].some(o => o.value === emailInput.value)) {
+      const option = document.createElement('option');
+      option.value = emailInput.value;
+      dataList.appendChild(option);
+    }
+
+    textInput.value = '';
+  } else {
+    alert('Please enter email and message');
+  }
+}
+
+// Example send button action
+document.getElementById('send-btn').addEventListener('click', () => {
+  const msg = document.getElementById('message-text').value;
+  if(msg.trim() !== '') {
+    const messages = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.textContent = msg;
+    div.style.padding = '0.5rem';
+    div.style.marginBottom = '0.5rem';
+    div.style.backgroundColor = 'rgba(0,0,0,0.1)';
+    div.style.borderRadius = '6px';
+    messages.appendChild(div);
+    document.getElementById('message-text').value = '';
+    messages.scrollTop = messages.scrollHeight;
+  }
+});
+</script>
+
 </body>
 </html>
