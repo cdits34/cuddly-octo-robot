@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Firebase Chatroom</title>
 <link rel="stylesheet" href="style.css">
+<style>
+/* Simple styling */
+.dm-container { margin-top: 0.5rem; display:flex; gap:0.5rem; }
+.dm-list { margin-top: 0.5rem; max-height:200px; overflow-y:auto; border:1px solid #ccc; padding:0.5rem; border-radius:6px; display:none; }
+.dm-list button { display:block; width:100%; margin-bottom:0.3rem; padding:0.3rem; cursor:pointer; border-radius:6px; border:none; background:#eee; }
+.dm-chat { border:1px solid #aaa; padding:0.5rem; margin-top:0.5rem; border-radius:6px; max-height:200px; overflow-y:auto; }
+.dm-message { margin-bottom:0.3rem; }
+</style>
 </head>
 <body>
 <div class="container">
@@ -15,10 +23,19 @@
   </div>
   <div id="user-profile"></div>
 
+  <!-- DM Form -->
   <form id="dm-form" style="display:none;">
     <input type="email" id="dm-email" placeholder="Enter email to DM" required>
-    <button type="submit">Start DM (a lil broken)</button>
+    <div class="dm-container">
+      <button type="submit">Start DM</button>
+      <button type="button" id="view-dms">View DMs</button>
+    </div>
   </form>
+
+  <!-- DM List -->
+  <div id="dm-list" class="dm-list"></div>
+  <!-- DM Chat Window -->
+  <div id="dm-chat" class="dm-chat"></div>
 
   <div id="messages"></div>
 
@@ -29,6 +46,74 @@
     <p><em>Note: videos may not be able to send due to size limits.</em></p>
   </form>
 </div>
-<script type="module" src="app.js"></script>
+
+<script>
+let dmHistory = []; // {email: string, messages: [{from: 'me'|'them', text: string}]}
+const dmListDiv = document.getElementById('dm-list');
+const dmChatDiv = document.getElementById('dm-chat');
+const dmForm = document.getElementById('dm-form');
+const dmEmailInput = document.getElementById('dm-email');
+const viewDmsBtn = document.getElementById('view-dms');
+
+// Start DM
+dmForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const email = dmEmailInput.value.trim();
+  if(!email) return;
+
+  // Check if already exists
+  if(!dmHistory.find(d => d.email===email)) dmHistory.push({email, messages: []});
+  alert("DM request sent to " + email);
+  dmEmailInput.value = '';
+});
+
+// View DMs
+viewDmsBtn.addEventListener('click', () => {
+  dmListDiv.innerHTML = '';
+  if(dmHistory.length === 0){
+    dmListDiv.innerHTML = '<p>No DMs yet</p>';
+  } else {
+    dmHistory.forEach(dm => {
+      const btn = document.createElement('button');
+      btn.textContent = dm.email;
+      btn.onclick = () => openDMChat(dm.email);
+      dmListDiv.appendChild(btn);
+    });
+  }
+  dmListDiv.style.display = 'block';
+});
+
+// Open private chat with selected email
+function openDMChat(email){
+  const dm = dmHistory.find(d => d.email===email);
+  if(!dm) return;
+  dmChatDiv.innerHTML = `<h4>Chat with ${email}</h4>`;
+  dm.messages.forEach(msg => {
+    const div = document.createElement('div');
+    div.className = 'dm-message';
+    div.textContent = `${msg.from}: ${msg.text}`;
+    dmChatDiv.appendChild(div);
+  });
+
+  // Add input to send message in this chat
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Type message';
+  input.style.width='70%';
+  const sendBtn = document.createElement('button');
+  sendBtn.textContent = 'Send';
+  sendBtn.onclick = () => {
+    if(!input.value) return;
+    dm.messages.push({from:'me', text:input.value});
+    const div = document.createElement('div');
+    div.className = 'dm-message';
+    div.textContent = `me: ${input.value}`;
+    dmChatDiv.appendChild(div);
+    input.value = '';
+  };
+  dmChatDiv.appendChild(input);
+  dmChatDiv.appendChild(sendBtn);
+}
+</script>
 </body>
 </html>
