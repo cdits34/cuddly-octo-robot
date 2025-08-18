@@ -17,6 +17,8 @@
 <body>
 <div class="container">
   <h1>Moberly Chatroom</h1>
+
+  <!-- Auth -->
   <div id="auth">
     <button id="login">Login with Google</button>
     <button id="logout" style="display:none;">Logout</button>
@@ -37,8 +39,8 @@
   <!-- DM Chat Window -->
   <div id="dm-chat" class="dm-chat"></div>
 
+  <!-- Main messages -->
   <div id="messages"></div>
-
   <form id="message-form" style="display:none;">
     <input type="text" id="message-input" placeholder="Type your message">
     <input type="file" id="file-input">
@@ -47,32 +49,97 @@
   </form>
 </div>
 
-<script>
-let dmHistory = []; // {email: string, messages: [{from: 'me'|'them', text: string}]}
-const dmListDiv = document.getElementById('dm-list');
-const dmChatDiv = document.getElementById('dm-chat');
-const dmForm = document.getElementById('dm-form');
-const dmEmailInput = document.getElementById('dm-email');
-const viewDmsBtn = document.getElementById('view-dms');
+<!-- Firebase SDKs -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getFirestore, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
-// Start DM
+// Firebase config
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_BUCKET",
+  messagingSenderId: "YOUR_SENDER",
+  appId: "YOUR_APP_ID"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+const loginBtn = document.getElementById("login");
+const logoutBtn = document.getElementById("logout");
+const userProfileDiv = document.getElementById("user-profile");
+const dmForm = document.getElementById("dm-form");
+const dmEmailInput = document.getElementById("dm-email");
+const viewDmsBtn = document.getElementById("view-dms");
+const dmListDiv = document.getElementById("dm-list");
+const dmChatDiv = document.getElementById("dm-chat");
+
+let dmHistory = []; // {email: string, messages: [{from:'me'|'them', text}]}
+
+// --- Auth ---
+loginBtn.onclick = async () => {
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    loginBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+    dmForm.style.display = 'block';
+    document.getElementById('message-form').style.display = 'block';
+    userProfileDiv.innerHTML = `<p>Logged in as ${user.displayName} (${user.email})</p><img src="${user.photoURL}" width="40" style="border-radius:50%;">`;
+    
+    // Save user to Firestore if not exists
+    const usersRef = collection(db, "users");
+    const snapshot = await getDocs(usersRef);
+    const exists = snapshot.docs.some(doc => doc.data().email === user.email);
+    if(!exists) {
+      await addDoc(usersRef, {
+        email: user.email,
+        name: user.displayName,
+        photoURL: user.photoURL
+      });
+    }
+  } catch(err) { console.error(err); }
+};
+
+logoutBtn.onclick = async () => {
+  await signOut(auth);
+  loginBtn.style.display = 'inline-block';
+  logoutBtn.style.display = 'none';
+  dmForm.style.display = 'none';
+  document.getElementById('message-form').style.display = 'none';
+  userProfileDiv.innerHTML = '';
+};
+
+// Keep track of auth state
+onAuthStateChanged(auth, (user) => {
+  if(user) {
+    loginBtn.style.display = 'none';
+    logoutBtn.style.display = 'inline-block';
+    dmForm.style.display = 'block';
+    document.getElementById('message-form').style.display = 'block';
+    userProfileDiv.innerHTML = `<p>Logged in as ${user.displayName} (${user.email})</p><img src="${user.photoURL}" width="40" style="border-radius:50%;">`;
+  }
+});
+
+// --- DM System ---
 dmForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const email = dmEmailInput.value.trim();
   if(!email) return;
-
-  // Check if already exists
   if(!dmHistory.find(d => d.email===email)) dmHistory.push({email, messages: []});
   alert("DM request sent to " + email);
   dmEmailInput.value = '';
 });
 
-// View DMs
 viewDmsBtn.addEventListener('click', () => {
   dmListDiv.innerHTML = '';
-  if(dmHistory.length === 0){
-    dmListDiv.innerHTML = '<p>No DMs yet</p>';
-  } else {
+  if(dmHistory.length===0){ dmListDiv.innerHTML = '<p>No DMs yet</p>'; }
+  else {
     dmHistory.forEach(dm => {
       const btn = document.createElement('button');
       btn.textContent = dm.email;
@@ -83,33 +150,30 @@ viewDmsBtn.addEventListener('click', () => {
   dmListDiv.style.display = 'block';
 });
 
-// Open private chat with selected email
 function openDMChat(email){
-  const dm = dmHistory.find(d => d.email===email);
+  const dm = dmHistory.find(d=>d.email===email);
   if(!dm) return;
   dmChatDiv.innerHTML = `<h4>Chat with ${email}</h4>`;
-  dm.messages.forEach(msg => {
+  dm.messages.forEach(msg=>{
     const div = document.createElement('div');
-    div.className = 'dm-message';
+    div.className='dm-message';
     div.textContent = `${msg.from}: ${msg.text}`;
     dmChatDiv.appendChild(div);
   });
-
-  // Add input to send message in this chat
   const input = document.createElement('input');
-  input.type = 'text';
-  input.placeholder = 'Type message';
+  input.type='text';
+  input.placeholder='Type message';
   input.style.width='70%';
   const sendBtn = document.createElement('button');
-  sendBtn.textContent = 'Send';
+  sendBtn.textContent='Send';
   sendBtn.onclick = () => {
     if(!input.value) return;
     dm.messages.push({from:'me', text:input.value});
     const div = document.createElement('div');
-    div.className = 'dm-message';
+    div.className='dm-message';
     div.textContent = `me: ${input.value}`;
     dmChatDiv.appendChild(div);
-    input.value = '';
+    input.value='';
   };
   dmChatDiv.appendChild(input);
   dmChatDiv.appendChild(sendBtn);
