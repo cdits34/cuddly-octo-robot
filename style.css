@@ -1,0 +1,6 @@
+body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; padding:0; }
+.container { max-width: 800px; margin: auto; padding: 20px; background:white; margin-top:30px; border-radius:10px; box-shadow:0 0 10px rgba(0,0,0,0.1); }
+#messages { border:1px solid #ccc; padding:10px; height:400px; overflow-y:auto; margin-bottom:10px; }
+.message { padding:5px; border-bottom:1px solid #eee; margin-bottom:5px; }
+img, video { display:block; margin-top:5px; }
+input, button { margin:5px 0; padding:8px; }

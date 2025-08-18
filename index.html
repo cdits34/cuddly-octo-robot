@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firebase Chatroom</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <h1>Firebase Chatroom</h1>
+  <div id="auth">
+    <button id="login">Login with Google</button>
+    <button id="logout" style="display:none;">Logout</button>
+  </div>
+  <div id="user-profile"></div>
+
+  <form id="dm-form" style="display:none;">
+    <input type="email" id="dm-email" placeholder="Enter email to DM" required>
+    <button type="submit">Start DM</button>
+  </form>
+
+  <div id="messages"></div>
+
+  <form id="message-form" style="display:none;">
+    <input type="text" id="message-input" placeholder="Type your message">
+    <input type="file" id="file-input">
+    <button type="submit">Send</button>
+    <p><em>Note: Large videos may not be able to send due to size limits.</em></p>
+  </form>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
