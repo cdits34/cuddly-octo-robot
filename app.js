@@ -26,17 +26,23 @@ const fileInput = document.getElementById("file-input");
 const messagesDiv = document.getElementById("messages");
 const dmForm = document.getElementById("dm-form");
 const dmEmailInput = document.getElementById("dm-email");
+const dmListDiv = document.getElementById("dm-list");
 const userProfile = document.getElementById("user-profile");
+const viewDmsBtn = document.getElementById("view-dms");
+
 let currentDMId = null;
 
-// Login / Logout
+// --- Login / Logout ---
 loginBtn.addEventListener("click", async () => {
   const provider = new GoogleAuthProvider();
   await signInWithPopup(auth, provider);
 });
-logoutBtn.addEventListener("click", async () => { await signOut(auth); });
 
-// Auth State
+logoutBtn.addEventListener("click", async () => {
+  await signOut(auth);
+});
+
+// --- Auth State ---
 onAuthStateChanged(auth, async user => {
   if(user){
     loginBtn.style.display = "none";
@@ -60,7 +66,7 @@ onAuthStateChanged(auth, async user => {
   }
 });
 
-// Render message
+// --- Render message ---
 function renderMessage(msg){
   let content = `<strong>${msg.name}:</strong> ${msg.text||""}`;
   if(msg.fileData){
@@ -71,7 +77,7 @@ function renderMessage(msg){
   return `<div class='message'><img src='${msg.photoURL}' width='25' style='border-radius:50%; vertical-align:middle; margin-right:5px;'>${content}</div>`;
 }
 
-// Public Chat
+// --- Public Chat ---
 const publicMessagesRef = collection(db,"messages");
 const publicQuery = query(publicMessagesRef, orderBy("createdAt","asc"));
 function loadPublicMessages(){
@@ -83,33 +89,104 @@ function loadPublicMessages(){
   });
 }
 
-// Private DM Form
+// --- DM Autocomplete ---
+let allUsers = [];
+dmEmailInput.addEventListener("input", async e => {
+  const val = e.target.value.toLowerCase();
+  if(allUsers.length === 0){
+    const usersSnap = await getDocs(collection(db,"users"));
+    allUsers = usersSnap.docs.map(d=>d.data()).filter(u=>u.uid !== auth.currentUser.uid);
+  }
+  const suggestions = allUsers.filter(u => u.email.toLowerCase().startsWith(val));
+  // Clear previous suggestions
+  const dropdownId = "autocomplete-list";
+  let dropdown = document.getElementById(dropdownId);
+  if(dropdown) dropdown.remove();
+
+  if(suggestions.length === 0) return;
+
+  dropdown = document.createElement("div");
+  dropdown.id = dropdownId;
+  dropdown.style.border = "1px solid #ccc";
+  dropdown.style.position = "absolute";
+  dropdown.style.background = "#fff";
+  suggestions.forEach(u=>{
+    const item = document.createElement("div");
+    item.style.padding = "4px";
+    item.style.cursor = "pointer";
+    item.innerHTML = `<img src="${u.photoURL}" width="25" style="border-radius:50%; margin-right:5px;">${u.email}`;
+    item.addEventListener("click", ()=>{ dmEmailInput.value = u.email; dropdown.remove(); });
+    dropdown.appendChild(item);
+  });
+  dmEmailInput.parentNode.appendChild(dropdown);
+});
+
+// --- Start DM ---
 dmForm.addEventListener("submit", async e => {
   e.preventDefault();
   const user = auth.currentUser;
-  const email = dmEmailInput.value.trim();
-  if(!email) return;
+  if(!user) return alert("Login first!");
 
-  // Look up user by email
-  const usersSnap = await getDocs(collection(db,"users"));
-  let otherUser = null;
-  usersSnap.forEach(doc=>{if(doc.data().email===email) otherUser = doc.data();});
+  const email = dmEmailInput.value.trim();
+  const otherUser = allUsers.find(u=>u.email===email);
   if(!otherUser) return alert("User not found!");
 
   const chatId = [user.uid,otherUser.uid].sort().join("_");
   currentDMId = chatId;
+
   const dmRef = collection(db,"privateMessages",chatId,"messages");
   const dmQuery = query(dmRef, orderBy("createdAt","asc"));
 
-  onSnapshot(dmQuery,snapshot=>{
+  onSnapshot(dmQuery, snapshot=>{
     messagesDiv.innerHTML="";
     snapshot.forEach(doc=>{messagesDiv.innerHTML+=renderMessage(doc.data());});
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
+
+  dmEmailInput.value = "";
 });
 
-// Send Message
-messageForm.addEventListener("submit", async e => {
+// --- View DMs ---
+viewDmsBtn.addEventListener("click", async ()=>{
+  const user = auth.currentUser;
+  if(!user) return;
+
+  // Fetch all private chats
+  const dmSnap = await getDocs(collection(db, "privateMessages"));
+  dmListDiv.innerHTML = "";
+  dmSnap.forEach(doc => {
+    const chatId = doc.id;
+    if(chatId.includes(user.uid)){
+      const otherUid = chatId.replace(user.uid,"").replace("_","");
+      const otherUser = allUsers.find(u=>u.uid===otherUid);
+      if(otherUser){
+        const btn = document.createElement("button");
+        btn.textContent = otherUser.email;
+        btn.style.width = "100%";
+        btn.style.marginBottom = "2px";
+        btn.onclick = ()=> openPrivateChatById(chatId);
+        dmListDiv.appendChild(btn);
+      }
+    }
+  });
+  dmListDiv.style.display = "block";
+});
+
+// --- Open Private Chat ---
+function openPrivateChatById(chatId){
+  currentDMId = chatId;
+  const dmRef = collection(db,"privateMessages",chatId,"messages");
+  const dmQuery = query(dmRef, orderBy("createdAt","asc"));
+
+  onSnapshot(dmQuery, snapshot=>{
+    messagesDiv.innerHTML="";
+    snapshot.forEach(doc=>{messagesDiv.innerHTML+=renderMessage(doc.data());});
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+}
+
+// --- Send Message ---
+messageForm.addEventListener("submit", async e=>{
   e.preventDefault();
   const user = auth.currentUser;
   if(!user) return alert("Login first!");
@@ -126,13 +203,21 @@ messageForm.addEventListener("submit", async e => {
     });
   }
 
-  const msgData = { uid:user.uid, name:user.displayName, photoURL:user.photoURL, text:messageInput.value||null, fileData:fileBase64, fileType:fileType, createdAt:serverTimestamp() };
+  const msgData = { 
+    uid:user.uid,
+    name:user.displayName,
+    photoURL:user.photoURL,
+    text:messageInput.value||null,
+    fileData:fileBase64,
+    fileType:fileType,
+    createdAt:serverTimestamp()
+  };
 
   if(currentDMId){
     const dmRef = collection(db,"privateMessages",currentDMId,"messages");
     await addDoc(dmRef,msgData);
   } else {
-    await addDoc(publicMessagesRef,msgData);
+    await addDoc(collection(db,"messages"),msgData);
   }
 
   messageInput.value=""; fileInput.value="";
