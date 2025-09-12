@@ -317,3 +317,4 @@ async function updateDMLists(){
     else dmListReceived.appendChild(item);
   }
 }
+export { auth, db };
