@@ -31,6 +31,7 @@ const messagesDiv = document.getElementById("messages");
 const dmForm = document.getElementById("dm-form");
 const dmEmailInput = document.getElementById("dm-email");
 const userProfile = document.getElementById("user-profile");
+const micBtn = document.getElementById("mic-btn");
 
 // Modal Elements
 const youtubeModal = document.getElementById("youtube-modal");
@@ -193,6 +194,57 @@ window.addEventListener("click",(e)=>{ if(e.target==youtubeModal) youtubeModal.s
 // YouTube Search
 youtubeSearchBtn.addEventListener("click", fetchYouTube);
 youtubeSearch.addEventListener("keydown",(e)=>{ if(e.key==="Enter") fetchYouTube(); });
+
+let mediaRecorder;
+let audioChunks = [];
+
+micBtn.addEventListener("click", async () => {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    return alert("Your browser does not support audio recording.");
+  }
+
+  if (!mediaRecorder || mediaRecorder.state === "inactive") {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+
+    mediaRecorder.addEventListener("dataavailable", event => {
+      audioChunks.push(event.data);
+    });
+
+    mediaRecorder.addEventListener("stop", async () => {
+      const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const fileBase64 = reader.result;
+        const user = auth.currentUser;
+        if (!user) return alert("Login first!");
+        const msgData = {
+          uid: user.uid,
+          name: user.displayName,
+          photoURL: user.photoURL,
+          fileData: fileBase64,
+          fileType: "audio/webm",
+          createdAt: serverTimestamp()
+        };
+
+        if (currentDMId) {
+          const dmRef = collection(db, "privateMessages", currentDMId, "messages");
+          await addDoc(dmRef, msgData);
+        } else {
+          await addDoc(publicMessagesRef, msgData);
+        }
+      };
+      reader.readAsDataURL(audioBlob);
+    });
+
+    mediaRecorder.start();
+    micBtn.textContent = "⏹️"; // Change button to stop
+  } else if (mediaRecorder.state === "recording") {
+    mediaRecorder.stop();
+    micBtn.textContent = "🎤"; // Reset button
+  }
+});
 
 async function fetchYouTube(){
   const q = youtubeSearch.value.trim();
