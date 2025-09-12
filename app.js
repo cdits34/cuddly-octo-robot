@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, setDoc, doc, serverTimestamp, query, orderBy, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, setDoc, doc, serverTimestamp, query, orderBy, onSnapshot, getDocs, where } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 // Firebase Config
 const firebaseConfig = {
@@ -23,113 +23,111 @@ const logoutBtn = document.getElementById("logout");
 const messageForm = document.getElementById("message-form");
 const messageInput = document.getElementById("message-input");
 const fileInput = document.getElementById("file-input");
-const fileBtn = document.getElementById("file-btn");
-const videoBtn = document.getElementById("video-btn");
+const youtubeBtn = document.getElementById("youtube-btn");
 const messagesDiv = document.getElementById("messages");
 const dmForm = document.getElementById("dm-form");
 const dmEmailInput = document.getElementById("dm-email");
 const userProfile = document.getElementById("user-profile");
 
-const videoPopup = document.getElementById("video-popup");
-const closePopup = document.getElementById("close-popup");
-const videoSearchInput = document.getElementById("video-search-input");
-const videoSearchBtn = document.getElementById("video-search-btn");
-const videoResults = document.getElementById("video-results");
+// Modal Elements
+const youtubeModal = document.getElementById("youtube-modal");
+const closeModal = document.getElementById("close-modal");
+const youtubeSearch = document.getElementById("youtube-search");
+const youtubeSearchBtn = document.getElementById("youtube-search-btn");
+const youtubeResults = document.getElementById("youtube-results");
 
 let currentDMId = null;
+let unsubscribeListener = null;
 
-// --- Utils ---
-function timeAgo(timestamp) {
-  if (!timestamp) return "";
-  const now = new Date();
-  const diff = (now - timestamp.toDate()) / 1000; // seconds
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff/60)} minutes ago`;
-  if (diff < 86400) return `${Math.floor(diff/3600)} hours ago`;
-  return timestamp.toDate().toLocaleString();
-}
-
-// --- Auth ---
+// Login / Logout
 loginBtn.addEventListener("click", async () => {
   const provider = new GoogleAuthProvider();
   await signInWithPopup(auth, provider);
 });
 logoutBtn.addEventListener("click", async () => { await signOut(auth); });
 
+// Auth State
 onAuthStateChanged(auth, async user => {
   if(user){
-    loginBtn.classList.add("hidden");
-    logoutBtn.classList.remove("hidden");
-    messageForm.classList.remove("hidden");
-    dmForm.classList.remove("hidden");
-    userProfile.innerHTML = `<img src='${user.photoURL}' width='40' class='avatar'> <span>${user.displayName}</span>`;
-    await setDoc(doc(db,"users",user.uid),{uid:user.uid,displayName:user.displayName,email:user.email,photoURL:user.photoURL},{merge:true});
+    loginBtn.style.display = "none";
+    logoutBtn.style.display = "block";
+    messageForm.style.display = "flex";
+    dmForm.style.display = "flex";
+    userProfile.innerHTML = `<img src='${user.photoURL}' width='40' style='border-radius:50%'> <span>${user.displayName}</span>`;
+
+    // Register user in Firestore
+    const userRef = doc(db, "users", user.uid);
+    await setDoc(userRef, { uid:user.uid, displayName:user.displayName, email:user.email, photoURL:user.photoURL }, { merge:true });
+
     loadPublicMessages();
   } else {
-    loginBtn.classList.remove("hidden");
-    logoutBtn.classList.add("hidden");
-    messageForm.classList.add("hidden");
-    dmForm.classList.add("hidden");
+    loginBtn.style.display = "block";
+    logoutBtn.style.display = "none";
+    messageForm.style.display = "none";
+    dmForm.style.display = "none";
     messagesDiv.innerHTML = "<p>Login to see messages</p>";
     userProfile.innerHTML = "";
+    if (unsubscribeListener) unsubscribeListener();
   }
 });
 
-// --- Render Message ---
-function renderMessage(msg){
-  let content = `<strong>${msg.name}</strong> <span class="meta">${timeAgo(msg.createdAt)}</span><br>${msg.text||""}`;
-
-  if(msg.fileData){
-    if(msg.fileType?.startsWith("image/")) content += `<br><img src='${msg.fileData}' width='200'>`;
-    else if(msg.fileType?.startsWith("video/")) content += `<br><video src='${msg.fileData}' width='300' controls></video>`;
-    else content += `<br><a href='${msg.fileData}' download='file'>📎 Download File</a>`;
-  }
-
-  if(msg.youtubeId){
-    content += `<br><iframe width="240" height="180" src="https://www.youtube.com/embed/${msg.youtubeId}" frameborder="0" allowfullscreen></iframe>`;
-  }
-
-  return `<div class='message'><img src='${msg.photoURL}' class='avatar'> ${content}</div>`;
+// Timestamp formatting
+function formatTimestamp(ts) {
+  if (!ts) return "";
+  const now = new Date();
+  const date = ts.toDate();
+  const diff = (now - date) / 1000;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return Math.floor(diff / 60) + " minutes ago";
+  if (diff < 86400) return Math.floor(diff / 3600) + " hours ago";
+  return date.toLocaleString();
 }
 
-// --- Public Chat ---
+// Render message
+function renderMessage(msg){
+  let header = `
+    <div class="msg-header">
+      <img src='${msg.photoURL}' width='25' class='avatar'>
+      <strong>${msg.name}</strong>
+      <span class="timestamp">${formatTimestamp(msg.createdAt)}</span>
+    </div>`;
+
+  let body = "";
+  if (msg.text) body += `<div class="msg-text">${msg.text}</div>`;
+
+  if (msg.fileData) {
+    if (msg.fileType?.startsWith("image/")) body += `<img src='${msg.fileData}' class='msg-img'>`;
+    else if (msg.fileType?.startsWith("video/")) body += `<video src='${msg.fileData}' width='300' controls></video>`;
+    else body += `<a href='${msg.fileData}' download>📎 Download File</a>`;
+  }
+
+  if (msg.youtubeId) {
+    body += `<iframe width="240" height="180" src="https://www.youtube.com/embed/${msg.youtubeId}" frameborder="0" allowfullscreen></iframe>`;
+  }
+
+  return `<div class="message">${header}${body}</div>`;
+}
+
+// Public Chat
 const publicMessagesRef = collection(db,"messages");
 const publicQuery = query(publicMessagesRef, orderBy("createdAt","asc"));
 function loadPublicMessages(){
   currentDMId = null;
-  onSnapshot(publicQuery, snapshot => {
-    messagesDiv.innerHTML = "";
-    snapshot.forEach(doc=>{messagesDiv.innerHTML+=renderMessage(doc.data());});
+  if (unsubscribeListener) unsubscribeListener();
+  unsubscribeListener = onSnapshot(publicQuery, snapshot => {
+    let html = "";
+    snapshot.forEach(doc=>{html += renderMessage(doc.data());});
+    messagesDiv.innerHTML = html;
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 }
 
-// --- DM ---
-dmForm.addEventListener("submit", async e => {
-  e.preventDefault();
-  const user = auth.currentUser;
-  const email = dmEmailInput.value.trim();
-  if(!email) return;
-  const usersSnap = await getDocs(collection(db,"users"));
-  let otherUser = null;
-  usersSnap.forEach(doc=>{if(doc.data().email===email) otherUser = doc.data();});
-  if(!otherUser) return alert("User not found!");
-  const chatId = [user.uid,otherUser.uid].sort().join("_");
-  currentDMId = chatId;
-  const dmRef = collection(db,"privateMessages",chatId,"messages");
-  const dmQuery = query(dmRef, orderBy("createdAt","asc"));
-  onSnapshot(dmQuery,snapshot=>{
-    messagesDiv.innerHTML="";
-    snapshot.forEach(doc=>{messagesDiv.innerHTML+=renderMessage(doc.data());});
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  });
-});
-
-// --- Send Message ---
+// Send Message
 messageForm.addEventListener("submit", async e => {
   e.preventDefault();
   const user = auth.currentUser;
   if(!user) return alert("Login first!");
+
   let fileBase64 = null; let fileType = null;
   if(fileInput.files.length>0){
     const file = fileInput.files[0];
@@ -141,38 +139,72 @@ messageForm.addEventListener("submit", async e => {
       reader.readAsDataURL(file);
     });
   }
-  const msgData = { uid:user.uid, name:user.displayName, photoURL:user.photoURL, text:messageInput.value||null, fileData:fileBase64, fileType:fileType, createdAt:serverTimestamp() };
-  const targetRef = currentDMId ? collection(db,"privateMessages",currentDMId,"messages") : publicMessagesRef;
-  await addDoc(targetRef,msgData);
+
+  const msgData = { 
+    uid:user.uid, 
+    name:user.displayName, 
+    photoURL:user.photoURL, 
+    text:messageInput.value||null, 
+    fileData:fileBase64, 
+    fileType:fileType, 
+    youtubeId:null,
+    createdAt:serverTimestamp() 
+  };
+
+  await addDoc(publicMessagesRef,msgData);
   messageInput.value=""; fileInput.value="";
 });
 
-// --- File Picker Button ---
-fileBtn.addEventListener("click", ()=> fileInput.click());
+/* ---------------- YouTube Modal ---------------- */
+// Open modal
+youtubeBtn.addEventListener("click", () => {
+  youtubeModal.style.display = "block";
+});
+// Close modal
+closeModal.addEventListener("click", () => {
+  youtubeModal.style.display = "none";
+});
+window.addEventListener("click", e => {
+  if (e.target === youtubeModal) youtubeModal.style.display = "none";
+});
 
-// --- Video Popup Logic ---
-videoBtn.addEventListener("click", ()=> videoPopup.classList.remove("hidden"));
-closePopup.addEventListener("click", ()=> videoPopup.classList.add("hidden"));
+// YouTube Search (using API v3 or a mock – replace with your API key if needed)
+youtubeSearchBtn.addEventListener("click", async () => {
+  const term = youtubeSearch.value.trim();
+  if (!term) return;
 
-videoSearchBtn.addEventListener("click", async ()=>{
-  const q = videoSearchInput.value.trim();
-  if(!q) return;
-  // Fetch from YouTube API (replace with your API key)
-  const apiKey = "YOUR_YOUTUBE_API_KEY";
-  const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(q)}&key=${apiKey}`);
-  const data = await res.json();
-  videoResults.innerHTML = "";
-  data.items.forEach(item=>{
-    const div = document.createElement("div");
-    div.innerHTML = `<img src="${item.snippet.thumbnails.default.url}" style="vertical-align:middle;"> ${item.snippet.title}`;
-    div.addEventListener("click", async ()=>{
-      const user = auth.currentUser;
-      if(!user) return alert("Login first!");
-      const msgData = { uid:user.uid, name:user.displayName, photoURL:user.photoURL, youtubeId:item.id.videoId, createdAt:serverTimestamp() };
-      const targetRef = currentDMId ? collection(db,"privateMessages",currentDMId,"messages") : publicMessagesRef;
-      await addDoc(targetRef,msgData);
-      videoPopup.classList.add("hidden");
-    });
-    videoResults.appendChild(div);
-  });
+  // Simple demo: embed fake results (replace with real YouTube API call if you have a key)
+  youtubeResults.innerHTML = `
+    <div class="youtube-item" data-id="dQw4w9WgXcQ">
+      <img src="https://img.youtube.com/vi/dQw4w9WgXcQ/0.jpg">
+      <span>Example Video Result</span>
+    </div>
+  `;
+});
+
+// Send selected video
+youtubeResults.addEventListener("click", async e => {
+  const item = e.target.closest(".youtube-item");
+  if (!item) return;
+  const videoId = item.dataset.id;
+
+  const user = auth.currentUser;
+  if (!user) return alert("Login first!");
+
+  const msgData = {
+    uid: user.uid,
+    name: user.displayName,
+    photoURL: user.photoURL,
+    text: null,
+    fileData: null,
+    fileType: null,
+    youtubeId: videoId,
+    createdAt: serverTimestamp()
+  };
+
+  await addDoc(publicMessagesRef, msgData);
+
+  youtubeModal.style.display = "none";
+  youtubeSearch.value = "";
+  youtubeResults.innerHTML = "";
 });
