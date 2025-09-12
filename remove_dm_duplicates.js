@@ -21,4 +21,4 @@ setInterval(() => {
       }
     });
   });
-}, 250); // check every 1 second
+}, 1); // check every 1 second
