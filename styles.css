@@ -142,3 +142,48 @@ body {
   background: #f4f6f9;
   border-radius: 6px;
 }
+#dm-container {
+  border: 1px solid #ccc;
+  padding: 10px;
+  width: 250px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.dm-list {
+  margin-top: 5px;
+}
+
+.dm-item {
+  display: flex;
+  align-items: center;
+  padding: 5px;
+  cursor: pointer;
+  border-radius: 5px;
+  margin-bottom: 5px;
+  background: #fff;
+  transition: background 0.2s;
+}
+
+.dm-item:hover {
+  background: #e0f0ff;
+}
+
+.dm-item img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+.dm-item .name {
+  flex: 1;
+}
+
+.dm-item .unread {
+  background: red;
+  color: #fff;
+  border-radius: 50%;
+  padding: 2px 6px;
+  font-size: 12px;
+}
