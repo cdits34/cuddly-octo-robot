@@ -283,23 +283,30 @@ async function updateDMLists(){
       <span class="name">${otherUser.displayName}</span>
       ${unread>0?`<span class="unread">${unread}</span>`:""}
     `;
-    item.onclick=async ()=>{
-      dmEmailInput.value=otherUser.email;
-      dmForm.dispatchEvent(new Event("submit"));
-      
-      backPublicBtn.style.display = "block"; // Show back button when viewing DM
-      
-      // mark read
-      dmQuerySnap.forEach(async docSnap=>{
-        const data=docSnap.data();
-        if(!data.readBy) data.readBy=[];
-        if(!data.readBy.includes(user.uid)) {
-          data.readBy.push(user.uid);
-          await setDoc(doc(db,"privateMessages",chatId,"messages",docSnap.id),data,{merge:true});
-        }
-      });
-      updateDMLists();
-    };
+    item.onclick = async ()=>{
+  dmEmailInput.value = otherUser.email;
+
+  // UNSUBSCRIBE previous listener if it exists
+  if (unsubscribeListener) unsubscribeListener();
+
+  // Trigger DM form submit to set currentDMId
+  dmForm.dispatchEvent(new Event("submit"));
+
+  // Show back button
+  backPublicBtn.style.display = "block";
+
+  // Mark messages as read
+  dmQuerySnap.forEach(async docSnap=>{
+    const data = docSnap.data();
+    if(!data.readBy) data.readBy=[];
+    if(!data.readBy.includes(user.uid)){
+      data.readBy.push(user.uid);
+      await setDoc(doc(db,"privateMessages",chatId,"messages",docSnap.id), data, {merge:true});
+    }
+  });
+
+  updateDMLists(); // refresh DM sidebar
+};
     backPublicBtn.onclick = ()=>{
   currentDMId = null;               // reset to public chat
   loadPublicMessages();              // reload public messages
