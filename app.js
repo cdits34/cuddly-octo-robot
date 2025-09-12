@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, setDoc, doc, serverTimestamp, query, orderBy, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, setDoc, doc, serverTimestamp, query, orderBy, onSnapshot, getDocs, where } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 // Firebase Config
 const firebaseConfig = {
@@ -23,11 +23,13 @@ const logoutBtn = document.getElementById("logout");
 const messageForm = document.getElementById("message-form");
 const messageInput = document.getElementById("message-input");
 const fileInput = document.getElementById("file-input");
+const youtubeBtn = document.getElementById("youtube-btn");
 const messagesDiv = document.getElementById("messages");
 const dmForm = document.getElementById("dm-form");
 const dmEmailInput = document.getElementById("dm-email");
 const userProfile = document.getElementById("user-profile");
 let currentDMId = null;
+let unsubscribeListener = null;
 
 // Login / Logout
 loginBtn.addEventListener("click", async () => {
@@ -57,18 +59,45 @@ onAuthStateChanged(auth, async user => {
     dmForm.style.display = "none";
     messagesDiv.innerHTML = "<p>Login to see messages</p>";
     userProfile.innerHTML = "";
+    if (unsubscribeListener) unsubscribeListener();
   }
 });
 
+// Timestamp formatting
+function formatTimestamp(ts) {
+  if (!ts) return "";
+  const now = new Date();
+  const date = ts.toDate();
+  const diff = (now - date) / 1000; // seconds
+  if (diff < 60) return "just now";
+  if (diff < 3600) return Math.floor(diff / 60) + " minutes ago";
+  if (diff < 86400) return Math.floor(diff / 3600) + " hours ago";
+  return date.toLocaleString();
+}
+
 // Render message
 function renderMessage(msg){
-  let content = `<strong>${msg.name}:</strong> ${msg.text||""}`;
-  if(msg.fileData){
-    if(msg.fileType.startsWith("image/")) content += `<br><img src='${msg.fileData}' width='200'>`;
-    else if(msg.fileType.startsWith("video/")) content += `<br><video src='${msg.fileData}' width='300' controls></video>`;
-    else content += `<br><a href='${msg.fileData}' download='file'>📎 Download File</a>`;
+  let header = `
+    <div class="msg-header">
+      <img src='${msg.photoURL}' width='25' class='avatar'>
+      <strong>${msg.name}</strong>
+      <span class="timestamp">${formatTimestamp(msg.createdAt)}</span>
+    </div>`;
+
+  let body = "";
+  if (msg.text) body += `<div class="msg-text">${msg.text}</div>`;
+
+  if (msg.fileData) {
+    if (msg.fileType?.startsWith("image/")) body += `<img src='${msg.fileData}' class='msg-img'>`;
+    else if (msg.fileType?.startsWith("video/")) body += `<video src='${msg.fileData}' width='300' controls></video>`;
+    else body += `<a href='${msg.fileData}' download>📎 Download File</a>`;
   }
-  return `<div class='message'><img src='${msg.photoURL}' width='25' style='border-radius:50%; vertical-align:middle; margin-right:5px;'>${content}</div>`;
+
+  if (msg.youtubeId) {
+    body += `<iframe width="240" height="180" src="https://www.youtube.com/embed/${msg.youtubeId}" frameborder="0" allowfullscreen></iframe>`;
+  }
+
+  return `<div class="message">${header}${body}</div>`;
 }
 
 // Public Chat
@@ -76,9 +105,11 @@ const publicMessagesRef = collection(db,"messages");
 const publicQuery = query(publicMessagesRef, orderBy("createdAt","asc"));
 function loadPublicMessages(){
   currentDMId = null;
-  onSnapshot(publicQuery, snapshot => {
-    messagesDiv.innerHTML = "";
-    snapshot.forEach(doc=>{messagesDiv.innerHTML+=renderMessage(doc.data());});
+  if (unsubscribeListener) unsubscribeListener();
+  unsubscribeListener = onSnapshot(publicQuery, snapshot => {
+    let html = "";
+    snapshot.forEach(doc=>{html += renderMessage(doc.data());});
+    messagesDiv.innerHTML = html;
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 }
@@ -91,24 +122,26 @@ dmForm.addEventListener("submit", async e => {
   if(!email) return;
 
   // Look up user by email
-  const usersSnap = await getDocs(collection(db,"users"));
-  let otherUser = null;
-  usersSnap.forEach(doc=>{if(doc.data().email===email) otherUser = doc.data();});
-  if(!otherUser) return alert("User not found!");
+  const q = query(collection(db,"users"), where("email","==",email));
+  const usersSnap = await getDocs(q);
+  if(usersSnap.empty) return alert("User not found!");
+  const otherUser = usersSnap.docs[0].data();
 
   const chatId = [user.uid,otherUser.uid].sort().join("_");
   currentDMId = chatId;
   const dmRef = collection(db,"privateMessages",chatId,"messages");
   const dmQuery = query(dmRef, orderBy("createdAt","asc"));
 
-  onSnapshot(dmQuery,snapshot=>{
-    messagesDiv.innerHTML="";
-    snapshot.forEach(doc=>{messagesDiv.innerHTML+=renderMessage(doc.data());});
+  if (unsubscribeListener) unsubscribeListener();
+  unsubscribeListener = onSnapshot(dmQuery,snapshot=>{
+    let html = "";
+    snapshot.forEach(doc=>{html += renderMessage(doc.data());});
+    messagesDiv.innerHTML = html;
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 });
 
-// Send Message
+// Send Text/File Message
 messageForm.addEventListener("submit", async e => {
   e.preventDefault();
   const user = auth.currentUser;
@@ -126,7 +159,16 @@ messageForm.addEventListener("submit", async e => {
     });
   }
 
-  const msgData = { uid:user.uid, name:user.displayName, photoURL:user.photoURL, text:messageInput.value||null, fileData:fileBase64, fileType:fileType, createdAt:serverTimestamp() };
+  const msgData = { 
+    uid:user.uid, 
+    name:user.displayName, 
+    photoURL:user.photoURL, 
+    text:messageInput.value||null, 
+    fileData:fileBase64, 
+    fileType:fileType, 
+    youtubeId:null,
+    createdAt:serverTimestamp() 
+  };
 
   if(currentDMId){
     const dmRef = collection(db,"privateMessages",currentDMId,"messages");
@@ -136,4 +178,36 @@ messageForm.addEventListener("submit", async e => {
   }
 
   messageInput.value=""; fileInput.value="";
+});
+
+// YouTube Button
+youtubeBtn.addEventListener("click", async () => {
+  const link = prompt("Enter YouTube video URL:");
+  if (!link) return;
+
+  // Extract videoId
+  const match = link.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (!match) return alert("Invalid YouTube link!");
+  const videoId = match[1];
+
+  const user = auth.currentUser;
+  if (!user) return alert("Login first!");
+
+  const msgData = {
+    uid: user.uid,
+    name: user.displayName,
+    photoURL: user.photoURL,
+    text: null,
+    fileData: null,
+    fileType: null,
+    youtubeId: videoId,
+    createdAt: serverTimestamp()
+  };
+
+  if (currentDMId) {
+    const dmRef = collection(db,"privateMessages",currentDMId,"messages");
+    await addDoc(dmRef,msgData);
+  } else {
+    await addDoc(publicMessagesRef,msgData);
+  }
 });
