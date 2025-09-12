@@ -2,74 +2,63 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SchoolChat</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>School Chatroom</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="header">
-    <h1>SchoolChat</h1>
-  </header>
+  <!-- Header -->
+  <div class="header">
+    <h2>School Chatroom</h2>
+    <div id="user-profile"></div>
+    <button id="login">Login with Google</button>
+    <button id="logout" style="display:none;">Logout</button>
+  </div>
 
+  <!-- Main -->
   <div class="main-container">
-    <!-- DM Sidebar -->
-   <div id="dm-container">
-  <h3>Direct Messages</h3>
-  <button id="create-group-btn">➕ Create Group Chat</button>
-  <button id="view-groups-btn">👥 View Group Chats</button>
-  <button id="back-to-dms-btn" style="display:none;">⬅ Back</button>
+    <!-- DM + Group Chat Sidebar -->
+    <div id="dm-container">
+      <h4>Direct Messages</h4>
+      <button id="create-group-btn">➕ Create Group</button>
+      <button id="view-groups-btn">📂 View Groups</button>
+      <div id="group-back-btn" style="display:none;">
+        <button>⬅️ Back to DMs</button>
+      </div>
 
-  <div id="dm-list" class="dm-list">
-    <!-- DM items will go here -->
-  </div>
+      <div class="dm-list">
+        <h5>Received</h5>
+        <div id="dm-list-received"></div>
+        <h5>Sent</h5>
+        <div id="dm-list-sent"></div>
+      </div>
 
-  <div id="group-list" class="dm-list" style="display:none;">
-    <!-- Group chat items will go here -->
-  </div>
-</div>
-
-<!-- Group Chat Modal -->
-<div id="group-modal" class="modal" style="display:none;">
-  <div class="modal-content">
-    <span id="close-group-modal" style="float:right;cursor:pointer;">&times;</span>
-    <h3>Create Group Chat</h3>
-    <input type="text" id="group-name" placeholder="Group Name" />
-    <input type="text" id="search-users" placeholder="Search users..." />
-
-    <div id="user-results"></div>
-    <h4>Selected:</h4>
-    <div id="selected-users"></div>
-
-    <button id="save-group-btn">Save Group</button>
-  </div>
-</div>
+      <div id="group-list" style="display:none;">
+        <h5>Your Groups</h5>
+        <div id="groups-container"></div>
+      </div>
+    </div>
 
     <!-- Chat Area -->
-    <section class="chat-area">
-      <div id="auth">
-        <button id="login">Login with Google</button>
-        <button id="logout" style="display:none;">Logout</button>
-      </div>
-      <div id="user-profile"></div>
-
-      <form id="dm-form" style="display:none;">
-        <input type="email" id="dm-email" placeholder="Enter email to DM" required>
-        <button type="submit">Start DM</button>
-      </form>
-
+    <div class="chat-area">
+      <button id="back-public-btn" style="display:none;">⬅️ Back to Public Chat</button>
       <div id="messages"></div>
 
-      <button id="back-public-btn" style="display:none;">⬅ Back to Public Chat</button>
-
+      <!-- Message Form -->
       <form id="message-form" style="display:none;">
-        <input type="text" id="message-input" placeholder="Type your message">
-        <input type="file" id="file-input" hidden>
+        <input type="text" id="message-input" placeholder="Type a message...">
+        <input type="file" id="file-input" style="display:none;">
         <button type="button" id="file-btn">📎</button>
-        <button type="button" id="youtube-btn">🎥</button>
+        <button type="button" id="youtube-btn">🎬</button>
         <button type="button" id="mic-btn">🎤</button>
         <button type="submit">Send</button>
       </form>
-    </section>
+
+      <!-- Start DM -->
+      <form id="dm-form" style="display:none;">
+        <input type="email" id="dm-email" placeholder="Enter user email">
+        <button type="submit">Start DM</button>
+      </form>
+    </div>
   </div>
 
   <!-- YouTube Modal -->
@@ -82,8 +71,8 @@
     </div>
   </div>
 
+  <!-- Scripts -->
   <script type="module" src="app.js"></script>
-  <script src="remove_dm_duplicates.js"></script>
   <script type="module" src="dm_unread_updater.js"></script>
 </body>
 </html>
