@@ -1,4 +1,4 @@
-/* Global */
+/* Global Styles */
 body {
   margin: 0;
   font-family: 'Segoe UI', Tahoma, sans-serif;
@@ -99,7 +99,7 @@ body {
   margin-top: 5px;
 }
 
-/* Popup */
+/* Modal */
 .modal {
   display: none;
   position: fixed;
