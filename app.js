@@ -39,6 +39,8 @@ const closeModal = document.getElementById("close-modal");
 const youtubeSearch = document.getElementById("youtube-search");
 const youtubeSearchBtn = document.getElementById("youtube-search-btn");
 const youtubeResults = document.getElementById("youtube-results");
+const backPublicBtn = document.getElementById("back-public-btn");
+
 
 let currentDMId = null;
 let unsubscribeListener = null;
@@ -284,6 +286,9 @@ async function updateDMLists(){
     item.onclick=async ()=>{
       dmEmailInput.value=otherUser.email;
       dmForm.dispatchEvent(new Event("submit"));
+      
+      backPublicBtn.style.display = "block"; // Show back button when viewing DM
+      
       // mark read
       dmQuerySnap.forEach(async docSnap=>{
         const data=docSnap.data();
@@ -295,6 +300,11 @@ async function updateDMLists(){
       });
       updateDMLists();
     };
+    backPublicBtn.onclick = ()=>{
+  currentDMId = null;               // reset to public chat
+  loadPublicMessages();              // reload public messages
+  backPublicBtn.style.display = "none"; // hide button
+};
 
     if(lastMessage?.uid===user.uid) dmListSent.appendChild(item);
     else dmListReceived.appendChild(item);
