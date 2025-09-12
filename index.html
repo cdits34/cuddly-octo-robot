@@ -10,28 +10,36 @@
   <div class="container">
     <h1>Moberly Chatroom</h1>
 
-    <!-- New Minecraft Button -->
+    <!-- Minecraft Button -->
     <div id="minecraft-section">
       <button onclick="window.location.href='index2.html'">Go to Minecraft</button>
       <p><strong>Server is ws://213.239.216.216:37432 (server refreshes every 12 minutes~)</strong></p>
     </div>
 
+    <!-- Auth Section -->
     <div id="auth">
       <button id="login">Login with Google</button>
       <button id="logout" style="display:none;">Logout</button>
     </div>
     <div id="user-profile"></div>
 
+    <!-- Direct Messages -->
     <form id="dm-form" style="display:none;">
       <input type="email" id="dm-email" placeholder="Enter email to DM" required>
       <button type="submit">Start DM (a lil broken)</button>
     </form>
 
+    <!-- Messages -->
     <div id="messages"></div>
 
+    <!-- Send Message -->
     <form id="message-form" style="display:none;">
       <input type="text" id="message-input" placeholder="Type your message">
       <input type="file" id="file-input">
+
+      <!-- New YouTube Button -->
+      <button type="button" id="youtube-btn" title="Send YouTube Video">🎥</button>
+
       <button type="submit">Send</button>
       <p><em>Note: videos may not be able to send due to size limits.</em></p>
     </form>
