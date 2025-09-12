@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, setDoc, doc, serverTimestamp, query, orderBy, onSnapshot, getDocs, where } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, setDoc, doc, serverTimestamp, query, orderBy, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 // Firebase Config
 const firebaseConfig = {
@@ -23,130 +23,113 @@ const logoutBtn = document.getElementById("logout");
 const messageForm = document.getElementById("message-form");
 const messageInput = document.getElementById("message-input");
 const fileInput = document.getElementById("file-input");
-const youtubeBtn = document.getElementById("youtube-btn");
+const fileBtn = document.getElementById("file-btn");
+const videoBtn = document.getElementById("video-btn");
 const messagesDiv = document.getElementById("messages");
 const dmForm = document.getElementById("dm-form");
 const dmEmailInput = document.getElementById("dm-email");
 const userProfile = document.getElementById("user-profile");
-let currentDMId = null;
-let unsubscribeListener = null;
 
-// Login / Logout
+const videoPopup = document.getElementById("video-popup");
+const closePopup = document.getElementById("close-popup");
+const videoSearchInput = document.getElementById("video-search-input");
+const videoSearchBtn = document.getElementById("video-search-btn");
+const videoResults = document.getElementById("video-results");
+
+let currentDMId = null;
+
+// --- Utils ---
+function timeAgo(timestamp) {
+  if (!timestamp) return "";
+  const now = new Date();
+  const diff = (now - timestamp.toDate()) / 1000; // seconds
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff/60)} minutes ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)} hours ago`;
+  return timestamp.toDate().toLocaleString();
+}
+
+// --- Auth ---
 loginBtn.addEventListener("click", async () => {
   const provider = new GoogleAuthProvider();
   await signInWithPopup(auth, provider);
 });
 logoutBtn.addEventListener("click", async () => { await signOut(auth); });
 
-// Auth State
 onAuthStateChanged(auth, async user => {
   if(user){
-    loginBtn.style.display = "none";
-    logoutBtn.style.display = "block";
-    messageForm.style.display = "flex";
-    dmForm.style.display = "flex";
-    userProfile.innerHTML = `<img src='${user.photoURL}' width='40' style='border-radius:50%'> <span>${user.displayName}</span>`;
-
-    // Register user in Firestore
-    const userRef = doc(db, "users", user.uid);
-    await setDoc(userRef, { uid:user.uid, displayName:user.displayName, email:user.email, photoURL:user.photoURL }, { merge:true });
-
+    loginBtn.classList.add("hidden");
+    logoutBtn.classList.remove("hidden");
+    messageForm.classList.remove("hidden");
+    dmForm.classList.remove("hidden");
+    userProfile.innerHTML = `<img src='${user.photoURL}' width='40' class='avatar'> <span>${user.displayName}</span>`;
+    await setDoc(doc(db,"users",user.uid),{uid:user.uid,displayName:user.displayName,email:user.email,photoURL:user.photoURL},{merge:true});
     loadPublicMessages();
   } else {
-    loginBtn.style.display = "block";
-    logoutBtn.style.display = "none";
-    messageForm.style.display = "none";
-    dmForm.style.display = "none";
+    loginBtn.classList.remove("hidden");
+    logoutBtn.classList.add("hidden");
+    messageForm.classList.add("hidden");
+    dmForm.classList.add("hidden");
     messagesDiv.innerHTML = "<p>Login to see messages</p>";
     userProfile.innerHTML = "";
-    if (unsubscribeListener) unsubscribeListener();
   }
 });
 
-// Timestamp formatting
-function formatTimestamp(ts) {
-  if (!ts) return "";
-  const now = new Date();
-  const date = ts.toDate();
-  const diff = (now - date) / 1000; // seconds
-  if (diff < 60) return "just now";
-  if (diff < 3600) return Math.floor(diff / 60) + " minutes ago";
-  if (diff < 86400) return Math.floor(diff / 3600) + " hours ago";
-  return date.toLocaleString();
-}
-
-// Render message
+// --- Render Message ---
 function renderMessage(msg){
-  let header = `
-    <div class="msg-header">
-      <img src='${msg.photoURL}' width='25' class='avatar'>
-      <strong>${msg.name}</strong>
-      <span class="timestamp">${formatTimestamp(msg.createdAt)}</span>
-    </div>`;
+  let content = `<strong>${msg.name}</strong> <span class="meta">${timeAgo(msg.createdAt)}</span><br>${msg.text||""}`;
 
-  let body = "";
-  if (msg.text) body += `<div class="msg-text">${msg.text}</div>`;
-
-  if (msg.fileData) {
-    if (msg.fileType?.startsWith("image/")) body += `<img src='${msg.fileData}' class='msg-img'>`;
-    else if (msg.fileType?.startsWith("video/")) body += `<video src='${msg.fileData}' width='300' controls></video>`;
-    else body += `<a href='${msg.fileData}' download>📎 Download File</a>`;
+  if(msg.fileData){
+    if(msg.fileType?.startsWith("image/")) content += `<br><img src='${msg.fileData}' width='200'>`;
+    else if(msg.fileType?.startsWith("video/")) content += `<br><video src='${msg.fileData}' width='300' controls></video>`;
+    else content += `<br><a href='${msg.fileData}' download='file'>📎 Download File</a>`;
   }
 
-  if (msg.youtubeId) {
-    body += `<iframe width="240" height="180" src="https://www.youtube.com/embed/${msg.youtubeId}" frameborder="0" allowfullscreen></iframe>`;
+  if(msg.youtubeId){
+    content += `<br><iframe width="240" height="180" src="https://www.youtube.com/embed/${msg.youtubeId}" frameborder="0" allowfullscreen></iframe>`;
   }
 
-  return `<div class="message">${header}${body}</div>`;
+  return `<div class='message'><img src='${msg.photoURL}' class='avatar'> ${content}</div>`;
 }
 
-// Public Chat
+// --- Public Chat ---
 const publicMessagesRef = collection(db,"messages");
 const publicQuery = query(publicMessagesRef, orderBy("createdAt","asc"));
 function loadPublicMessages(){
   currentDMId = null;
-  if (unsubscribeListener) unsubscribeListener();
-  unsubscribeListener = onSnapshot(publicQuery, snapshot => {
-    let html = "";
-    snapshot.forEach(doc=>{html += renderMessage(doc.data());});
-    messagesDiv.innerHTML = html;
+  onSnapshot(publicQuery, snapshot => {
+    messagesDiv.innerHTML = "";
+    snapshot.forEach(doc=>{messagesDiv.innerHTML+=renderMessage(doc.data());});
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 }
 
-// Private DM Form
+// --- DM ---
 dmForm.addEventListener("submit", async e => {
   e.preventDefault();
   const user = auth.currentUser;
   const email = dmEmailInput.value.trim();
   if(!email) return;
-
-  // Look up user by email
-  const q = query(collection(db,"users"), where("email","==",email));
-  const usersSnap = await getDocs(q);
-  if(usersSnap.empty) return alert("User not found!");
-  const otherUser = usersSnap.docs[0].data();
-
+  const usersSnap = await getDocs(collection(db,"users"));
+  let otherUser = null;
+  usersSnap.forEach(doc=>{if(doc.data().email===email) otherUser = doc.data();});
+  if(!otherUser) return alert("User not found!");
   const chatId = [user.uid,otherUser.uid].sort().join("_");
   currentDMId = chatId;
   const dmRef = collection(db,"privateMessages",chatId,"messages");
   const dmQuery = query(dmRef, orderBy("createdAt","asc"));
-
-  if (unsubscribeListener) unsubscribeListener();
-  unsubscribeListener = onSnapshot(dmQuery,snapshot=>{
-    let html = "";
-    snapshot.forEach(doc=>{html += renderMessage(doc.data());});
-    messagesDiv.innerHTML = html;
+  onSnapshot(dmQuery,snapshot=>{
+    messagesDiv.innerHTML="";
+    snapshot.forEach(doc=>{messagesDiv.innerHTML+=renderMessage(doc.data());});
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 });
 
-// Send Text/File Message
+// --- Send Message ---
 messageForm.addEventListener("submit", async e => {
   e.preventDefault();
   const user = auth.currentUser;
   if(!user) return alert("Login first!");
-
   let fileBase64 = null; let fileType = null;
   if(fileInput.files.length>0){
     const file = fileInput.files[0];
@@ -158,56 +141,38 @@ messageForm.addEventListener("submit", async e => {
       reader.readAsDataURL(file);
     });
   }
-
-  const msgData = { 
-    uid:user.uid, 
-    name:user.displayName, 
-    photoURL:user.photoURL, 
-    text:messageInput.value||null, 
-    fileData:fileBase64, 
-    fileType:fileType, 
-    youtubeId:null,
-    createdAt:serverTimestamp() 
-  };
-
-  if(currentDMId){
-    const dmRef = collection(db,"privateMessages",currentDMId,"messages");
-    await addDoc(dmRef,msgData);
-  } else {
-    await addDoc(publicMessagesRef,msgData);
-  }
-
+  const msgData = { uid:user.uid, name:user.displayName, photoURL:user.photoURL, text:messageInput.value||null, fileData:fileBase64, fileType:fileType, createdAt:serverTimestamp() };
+  const targetRef = currentDMId ? collection(db,"privateMessages",currentDMId,"messages") : publicMessagesRef;
+  await addDoc(targetRef,msgData);
   messageInput.value=""; fileInput.value="";
 });
 
-// YouTube Button
-youtubeBtn.addEventListener("click", async () => {
-  const link = prompt("Enter YouTube video URL:");
-  if (!link) return;
+// --- File Picker Button ---
+fileBtn.addEventListener("click", ()=> fileInput.click());
 
-  // Extract videoId
-  const match = link.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  if (!match) return alert("Invalid YouTube link!");
-  const videoId = match[1];
+// --- Video Popup Logic ---
+videoBtn.addEventListener("click", ()=> videoPopup.classList.remove("hidden"));
+closePopup.addEventListener("click", ()=> videoPopup.classList.add("hidden"));
 
-  const user = auth.currentUser;
-  if (!user) return alert("Login first!");
-
-  const msgData = {
-    uid: user.uid,
-    name: user.displayName,
-    photoURL: user.photoURL,
-    text: null,
-    fileData: null,
-    fileType: null,
-    youtubeId: videoId,
-    createdAt: serverTimestamp()
-  };
-
-  if (currentDMId) {
-    const dmRef = collection(db,"privateMessages",currentDMId,"messages");
-    await addDoc(dmRef,msgData);
-  } else {
-    await addDoc(publicMessagesRef,msgData);
-  }
+videoSearchBtn.addEventListener("click", async ()=>{
+  const q = videoSearchInput.value.trim();
+  if(!q) return;
+  // Fetch from YouTube API (replace with your API key)
+  const apiKey = "YOUR_YOUTUBE_API_KEY";
+  const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(q)}&key=${apiKey}`);
+  const data = await res.json();
+  videoResults.innerHTML = "";
+  data.items.forEach(item=>{
+    const div = document.createElement("div");
+    div.innerHTML = `<img src="${item.snippet.thumbnails.default.url}" style="vertical-align:middle;"> ${item.snippet.title}`;
+    div.addEventListener("click", async ()=>{
+      const user = auth.currentUser;
+      if(!user) return alert("Login first!");
+      const msgData = { uid:user.uid, name:user.displayName, photoURL:user.photoURL, youtubeId:item.id.videoId, createdAt:serverTimestamp() };
+      const targetRef = currentDMId ? collection(db,"privateMessages",currentDMId,"messages") : publicMessagesRef;
+      await addDoc(targetRef,msgData);
+      videoPopup.classList.add("hidden");
+    });
+    videoResults.appendChild(div);
+  });
 });
