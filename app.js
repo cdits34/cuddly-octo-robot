@@ -155,6 +155,71 @@ dmForm.addEventListener("submit", async e => {
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 });
+const dmListReceived = document.getElementById("dm-list-received");
+const dmListSent = document.getElementById("dm-list-sent");
+
+// Store unread counts
+let unreadCounts = {};
+
+// Function to update DM lists
+async function updateDMLists() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  // Fetch all users
+  const usersSnap = await getDocs(collection(db, "users"));
+  const users = [];
+  usersSnap.forEach(doc => {
+    if (doc.id !== user.uid) users.push(doc.data());
+  });
+
+  dmListReceived.innerHTML = "";
+  dmListSent.innerHTML = "";
+
+  for (const otherUser of users) {
+    const chatId = [user.uid, otherUser.uid].sort().join("_");
+    const dmRef = collection(db, "privateMessages", chatId, "messages");
+    const dmQuerySnap = await getDocs(query(dmRef, orderBy("createdAt","asc")));
+
+    let unread = 0;
+    let lastMessage = null;
+
+    dmQuerySnap.forEach(doc => {
+      const data = doc.data();
+      lastMessage = data;
+      if (data.uid !== user.uid && !data.readBy?.includes(user.uid)) unread++;
+    });
+
+    // Create DM item
+    const item = document.createElement("div");
+    item.classList.add("dm-item");
+    item.innerHTML = `
+      <img src="${otherUser.photoURL}" alt="pfp">
+      <span class="name">${otherUser.displayName}</span>
+      ${unread > 0 ? `<span class="unread">${unread}</span>` : ""}
+    `;
+
+    // Click to open DM
+    item.addEventListener("click", async () => {
+      dmEmailInput.value = otherUser.email;
+      dmForm.dispatchEvent(new Event("submit"));
+      // Mark messages as read
+      dmQuerySnap.forEach(async docSnap => {
+        const data = docSnap.data();
+        if (!data.readBy) data.readBy = [];
+        if (!data.readBy.includes(user.uid)) {
+          data.readBy.push(user.uid);
+          await setDoc(doc(db,"privateMessages",chatId,"messages",docSnap.id), data, {merge:true});
+        }
+      });
+      updateDMLists(); // refresh unread dots
+    });
+
+    // Sort sent vs received
+    if (lastMessage?.uid === user.uid) dmListSent.appendChild(item);
+    else dmListReceived.appendChild(item);
+  }
+}
 
 // Send Message
 messageForm.addEventListener("submit", async e => {
