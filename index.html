@@ -3,44 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Moberly Chatroom</title>
+  <title>SchoolChat</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="container">
-    <h1>Moberly Chatroom</h1>
+  <!-- Navbar -->
+  <header class="navbar">
+    <div class="logo">SchoolChat</div>
+    <div id="user-profile" class="profile"></div>
+    <button id="login" class="btn">Login</button>
+    <button id="logout" class="btn hidden">Logout</button>
+  </header>
 
-    <!-- Minecraft Button -->
-    <div id="minecraft-section">
-      <button onclick="window.location.href='index2.html'">Go to Minecraft</button>
-      <p><strong>Server is ws://213.239.216.216:37432 (server refreshes every 12 minutes~)</strong></p>
-    </div>
+  <!-- Chat Area -->
+  <main class="chat-container">
+    <aside class="sidebar">
+      <form id="dm-form" class="hidden">
+        <input id="dm-email" type="email" placeholder="DM by email">
+        <button type="submit" class="btn">Start DM</button>
+      </form>
+    </aside>
 
-    <!-- Auth -->
-    <div id="auth">
-      <button id="login">Login with Google</button>
-      <button id="logout" style="display:none;">Logout</button>
-    </div>
-    <div id="user-profile"></div>
-
-    <!-- DM -->
-    <form id="dm-form" style="display:none;">
-      <input type="email" id="dm-email" placeholder="Enter email to DM" required>
-      <button type="submit">Start DM</button>
-    </form>
-
-    <!-- Messages -->
-    <div id="messages"></div>
-
-    <!-- Message Form -->
-    <form id="message-form" style="display:none;">
-      <input type="text" id="message-input" placeholder="Type your message">
-      <input type="file" id="file-input">
-
-      <button type="button" id="youtube-btn" title="Send YouTube Video">🎥</button>
-      <button type="submit">Send</button>
-    </form>
-  </div>
+    <section class="chat-box">
+      <div id="messages" class="messages"></div>
+      <form id="message-form" class="message-form hidden">
+        <input id="message-input" type="text" placeholder="Type a message..." />
+        <input id="file-input" type="file" hidden />
+        <button type="button" id="file-btn" class="icon-btn">📎</button>
+        <button type="button" id="youtube-btn" class="icon-btn">🎥</button>
+        <button type="submit" class="btn send-btn">Send</button>
+      </form>
+    </section>
+  </main>
 
   <!-- YouTube Search Modal -->
   <div id="youtube-modal" class="modal">
@@ -48,7 +42,7 @@
       <span id="close-modal">&times;</span>
       <h2>Search YouTube</h2>
       <input type="text" id="youtube-search" placeholder="Enter search term...">
-      <button id="youtube-search-btn">Search</button>
+      <button id="youtube-search-btn" class="btn">Search</button>
       <div id="youtube-results"></div>
     </div>
   </div>
