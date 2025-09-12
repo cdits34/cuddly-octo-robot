@@ -97,11 +97,22 @@ function renderMessage(msg){
 
   let body = "";
   if (msg.text) body += `<div class="msg-text">${msg.text}</div>`;
-  if (msg.fileData) {
-    if (msg.fileType?.startsWith("image/")) body += `<img src='${msg.fileData}' class='msg-img'>`;
-    else if (msg.fileType?.startsWith("video/")) body += `<video src='${msg.fileData}' width='240' controls></video>`;
-    else body += `<a href='${msg.fileData}' download>📎 Download File</a>`;
-  }
+  // Audio first
+if (msg.fileData && msg.fileType?.startsWith("audio/")) {
+    body += `<audio controls src='${msg.fileData}'></audio>`;
+} 
+// Images
+else if (msg.fileData && msg.fileType?.startsWith("image/")) {
+    body += `<img src='${msg.fileData}' class='msg-img'>`;
+}
+// Videos
+else if (msg.fileData && msg.fileType?.startsWith("video/")) {
+    body += `<video src='${msg.fileData}' width='240' controls></video>`;
+}
+// Other files
+else if (msg.fileData) {
+    body += `<a href='${msg.fileData}' download>📎 Download File</a>`;
+}
   if (msg.youtubeEmbed) body += `<iframe src="https://www.youtube.com/embed/${msg.youtubeEmbed}" width="240" height="180" frameborder="0" allowfullscreen></iframe>`;
 
   return `<div class='message'>${header}${body}</div>`;
