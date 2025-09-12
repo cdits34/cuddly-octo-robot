@@ -13,15 +13,36 @@
 
   <div class="main-container">
     <!-- DM Sidebar -->
-    <aside id="dm-container">
-      <h3>Direct Messages</h3>
-      <div id="dm-list-sent" class="dm-list">
-        <h4>Sent</h4>
-      </div>
-      <div id="dm-list-received" class="dm-list">
-        <h4>Received</h4>
-      </div>
-    </aside>
+   <div id="dm-container">
+  <h3>Direct Messages</h3>
+  <button id="create-group-btn">➕ Create Group Chat</button>
+  <button id="view-groups-btn">👥 View Group Chats</button>
+  <button id="back-to-dms-btn" style="display:none;">⬅ Back</button>
+
+  <div id="dm-list" class="dm-list">
+    <!-- DM items will go here -->
+  </div>
+
+  <div id="group-list" class="dm-list" style="display:none;">
+    <!-- Group chat items will go here -->
+  </div>
+</div>
+
+<!-- Group Chat Modal -->
+<div id="group-modal" class="modal" style="display:none;">
+  <div class="modal-content">
+    <span id="close-group-modal" style="float:right;cursor:pointer;">&times;</span>
+    <h3>Create Group Chat</h3>
+    <input type="text" id="group-name" placeholder="Group Name" />
+    <input type="text" id="search-users" placeholder="Search users..." />
+
+    <div id="user-results"></div>
+    <h4>Selected:</h4>
+    <div id="selected-users"></div>
+
+    <button id="save-group-btn">Save Group</button>
+  </div>
+</div>
 
     <!-- Chat Area -->
     <section class="chat-area">
