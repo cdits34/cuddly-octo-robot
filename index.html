@@ -36,6 +36,22 @@
         <button type="submit">Start DM</button>
       </form>
 
+      
+      <div id="chat-header-controls" style="margin:8px 0;">
+        <button id="add-person-btn" style="display:none;">➕ Add Person</button>
+        <span id="chat-title" style="font-weight:bold; margin-left:8px;"></span>
+      </div>
+
+      <!-- Add Person Modal -->
+      <div id="add-person-modal" style="display:none; position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); background:white; padding:12px; border:1px solid #ccc; z-index:1000;">
+        <h3>Add person to chat</h3>
+        <input id="add-person-search" placeholder="Search users by displayName or email" style="width:100%; padding:6px;">
+        <div id="add-person-results" style="max-height:240px; overflow:auto; margin-top:8px;"></div>
+        <div style="margin-top:8px; text-align:right;">
+          <button id="add-person-cancel">Cancel</button>
+        </div>
+      </div>
+    
       <div id="messages"></div>
 
       <button id="back-public-btn" style="display:none;">⬅ Back to Public Chat</button>
